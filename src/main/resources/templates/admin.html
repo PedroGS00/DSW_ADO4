@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments :: head('Admin')"></head>
+<body>
+<div th:replace="fragments :: header"></div>
+<main class="container py-4">
+  <h1>Admin</h1>
+  <div sec:authorize="hasRole('ADMIN')">
+    <section>
+      <h2>Novo Curso</h2>
+      <form id="create-form" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Nome</label>
+          <input type="text" class="form-control" id="name" required minlength="2" maxlength="100" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-control" id="description" maxlength="500" />
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary">Cadastrar</button>
+        </div>
+      </form>
+    </section>
+    <section>
+      <h2>Lista de Cursos</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="courses-body"></tbody>
+      </table>
+      <div id="admin-error" class="alert alert-danger" style="display:none">Erro ao carregar ou operar cursos.</div>
+    </section>
+  </div>
+</main>
+<div th:replace="fragments :: footer"></div>
+</body>
+<script>
+  const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content')
+  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content')
+  const bodyEl = document.getElementById('courses-body')
+  const errorEl = document.getElementById('admin-error')
+  function load() {
+    fetch('/api/resources')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(items => {
+        bodyEl.innerHTML = ''
+        items.forEach(it => {
+          const tr = document.createElement('tr')
+          tr.innerHTML = `
+            <td>${it.id}</td>
+            <td>${it.name}</td>
+            <td>${it.description || ''}</td>
+            <td>
+              <button data-id="${it.id}" class="edit btn btn-sm btn-outline-primary me-2">Editar</button>
+              <button data-id="${it.id}" class="delete btn btn-sm btn-outline-danger">Remover</button>
+            </td>
+          `
+          bodyEl.appendChild(tr)
+        })
+      })
+      .catch(() => { errorEl.style.display = 'block' })
+  }
+  function create(e) {
+    e.preventDefault()
+    const name = document.getElementById('name').value.trim()
+    const description = document.getElementById('description').value.trim()
+    if (!name || name.length < 2) return alert('Nome inválido')
+    fetch('/api/resources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+      body: JSON.stringify({ name, description })
+    })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(() => { document.getElementById('create-form').reset(); load() })
+    .catch(() => alert('Erro ao cadastrar'))
+  }
+  function edit(id) {
+    const currentRow = [...bodyEl.querySelectorAll('tr')].find(tr => tr.querySelector('button.edit')?.dataset.id == id)
+    const currentName = currentRow ? currentRow.children[1].textContent : ''
+    const currentDesc = currentRow ? currentRow.children[2].textContent : ''
+    const name = prompt('Novo nome', currentName) || ''
+    const description = prompt('Nova descrição', currentDesc) || ''
+    if (!name || name.trim().length < 2) return
+    fetch(`/api/resources/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+      body: JSON.stringify({ name: name.trim(), description: description.trim() })
+    })
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(() => load())
+    .catch(() => alert('Erro ao editar'))
+  }
+  function remove(id) {
+    if (!confirm('Remover este curso?')) return
+    fetch(`/api/resources/${id}`, { method: 'DELETE', headers: { [csrfHeader]: csrfToken } })
+      .then(r => r.ok ? Promise.resolve() : Promise.reject())
+      .then(() => load())
+      .catch(() => alert('Erro ao remover'))
+  }
+  document.getElementById('create-form').addEventListener('submit', create)
+  bodyEl.addEventListener('click', e => {
+    const id = e.target.dataset.id
+    if (e.target.className === 'edit') edit(id)
+    if (e.target.className === 'delete') remove(id)
+  })
+  load()
+</script>
+</html>

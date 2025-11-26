@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments :: head('Página Inicial')"></head>
+<body>
+<div th:replace="fragments :: header"></div>
+<main class="container py-4">
+  <h1 class="mb-3">Bem-vindo</h1>
+  <p class="text-muted">Esta é uma página pública.</p>
+  <section class="mt-4">
+    <h2 class="h4">Cursos Disponíveis</h2>
+    <ul id="courses" class="list-group"></ul>
+    <div id="courses-empty" class="alert alert-info mt-3" style="display:none">Nenhum curso cadastrado.</div>
+    <div id="courses-error" class="alert alert-danger mt-3" style="display:none">Erro ao carregar cursos.</div>
+  </section>
+</main>
+<div th:replace="fragments :: footer"></div>
+</body>
+<script>
+  const listEl = document.getElementById('courses')
+  const emptyEl = document.getElementById('courses-empty')
+  const errorEl = document.getElementById('courses-error')
+  fetch('/api/resources')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(items => {
+      if (!items || items.length === 0) {
+        emptyEl.style.display = 'block'
+        return
+      }
+      items.forEach(it => {
+        const li = document.createElement('li')
+        li.className = 'list-group-item'
+        li.textContent = it.description ? `${it.name} — ${it.description}` : it.name
+        listEl.appendChild(li)
+      })
+    })
+    .catch(() => { errorEl.style.display = 'block' })
+</script>
+</html>
